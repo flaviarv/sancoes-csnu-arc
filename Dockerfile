@@ -42,10 +42,6 @@ COPY csnu_list.parquet ./csnu_list.parquet
 # Frontend compilado (copiado do stage anterior)
 COPY --from=frontend-build /app/dist ./static
 
-# Entrypoint
-COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
-
 EXPOSE 7860
 
-CMD ["./entrypoint.sh"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
