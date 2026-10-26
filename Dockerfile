@@ -9,14 +9,14 @@ WORKDIR /app
 RUN npm install -g bun@1
 
 # Copia dependências e instala
-COPY package.json bun.lock* ./
+COPY frontend/package.json frontend/bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # Copia código fonte
-COPY index.html vite.config.ts tsconfig.json tailwind.config.js postcss.config.js ./
-COPY src/ ./src/
+COPY frontend/index.html frontend/vite.config.ts frontend/tsconfig.json frontend/tailwind.config.js frontend/postcss.config.js ./
+COPY frontend/src/ ./src/
 
-# Build de produção (sem proxy — o FastAPI serve os arquivos estáticos)
+# Build de produção (FastAPI serve os arquivos estáticos)
 RUN bunx vite build
 
 # ─────────────────────────────────────────────
@@ -32,12 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependências Python
-COPY sancoes-csnu-arc/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir fastapi uvicorn pandas pyarrow aiofiles
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Código do backend (versão Docker com static files)
 COPY main_docker.py ./main.py
-COPY sancoes-csnu-arc/csnu_list.parquet ./csnu_list.parquet
+COPY csnu_list.parquet ./csnu_list.parquet
 
 # Frontend compilado (copiado do stage anterior)
 COPY --from=frontend-build /app/dist ./static
