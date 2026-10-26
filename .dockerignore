@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+contracts/out/
+contracts/cache/
+sancoes-csnu-arc/__pycache__/
+sancoes-csnu-arc/.git/
+.git/
+*.log
