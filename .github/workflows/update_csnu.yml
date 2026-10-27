@@ -1,9 +1,12 @@
-name: Atualização Automática da Lista CSNU
+name: Atualização Automática da Lista CSNU e Build do Frontend
 
 on:
   schedule:
     # Executa diariamente às 04:00 UTC (01:00 horário de Brasília)
     - cron: '0 4 * * *'
+  push:
+    paths:
+      - 'frontend/**'
   # Permite executar manualmente pelo painel do GitHub na aba "Actions"
   workflow_dispatch:
 
@@ -24,7 +27,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Instalar Dependências
+      - name: Instalar Dependências Python
         run: |
           pip install pandas pyarrow
 
@@ -32,19 +35,32 @@ jobs:
         run: |
           python scripts/etl_csnu.py
 
-      - name: Commit e Push se houver novas sanções
+      - name: Configurar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Compilar Frontend (Bun + Vite)
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+          bun run build
+          cd ..
+          rm -rf public/assets static/assets
+          cp -r frontend/dist/* public/
+          cp -r frontend/dist/* static/
+
+      - name: Commit e Push se houver alterações
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Adiciona os arquivos gerados
-          git add csnu_list.parquet public/sanctioned_names.json static/sanctioned_names.json
+          git add csnu_list.parquet public/ static/
           
-          # Só commita se houver diferenças reais
           if git diff --staged --quiet; then
-            echo "Nenhuma alteração na lista da ONU encontrada hoje."
+            echo "Nenhuma alteração encontrada."
           else
             echo "Alterações detectadas! Enviando commit..."
-            git commit -m "chore(data): lista de sanções CSNU atualizada automaticamente"
+            git commit -m "chore: atualiza lista CSNU e compila frontend automaticamente"
             git push
           fi
