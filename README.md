@@ -1,3 +1,16 @@
+---
+title: Sancoes Csnu Arc Testnet
+emoji: 💻
+colorFrom: yellow
+colorTo: green
+sdk: gradio
+sdk_version: "6.30.0"
+python_version: "3.12"
+app_file: app.py
+pinned: false
+short_description: sancoes-csnu-arc-testnet-online
+---
+
 # CSNU Sanctions Checker
 
 A web app that lets users verify whether a name appears in the UN Security Council Consolidated Sanctions List (CSNU). Each search is paid with 0.1 USDC via an ERC-8183 escrow job on Arc Testnet.

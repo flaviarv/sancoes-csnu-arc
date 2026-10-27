@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .vscode/
+frontend/node_modules/
+node_modules/
+sancoes-csnu-arc-testnet/
