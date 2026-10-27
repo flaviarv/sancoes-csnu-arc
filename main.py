@@ -46,12 +46,12 @@ def load_csnu_dataset(parquet_path: str = "csnu_list.parquet"):
             if col in row and pd.notna(row[col]):
                 extracted_names.add(normalize_text(str(row[col])))
 
-        if "INDIVIDUAL_ALIAS" in row and isinstance(row["INDIVIDUAL_ALIAS"], list):
+        if "INDIVIDUAL_ALIAS" in row and hasattr(row["INDIVIDUAL_ALIAS"], "__iter__") and not isinstance(row["INDIVIDUAL_ALIAS"], (str, bytes)):
             for alias in row["INDIVIDUAL_ALIAS"]:
                 if isinstance(alias, dict) and alias.get("ALIAS_NAME"):
                     extracted_names.add(normalize_text(str(alias["ALIAS_NAME"])))
 
-        if "ENTITY_ALIAS" in row and isinstance(row["ENTITY_ALIAS"], list):
+        if "ENTITY_ALIAS" in row and hasattr(row["ENTITY_ALIAS"], "__iter__") and not isinstance(row["ENTITY_ALIAS"], (str, bytes)):
             for alias in row["ENTITY_ALIAS"]:
                 if isinstance(alias, dict) and alias.get("ALIAS_NAME"):
                     extracted_names.add(normalize_text(str(alias["ALIAS_NAME"])))

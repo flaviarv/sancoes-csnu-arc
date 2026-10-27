@@ -1,0 +1,50 @@
+name: Atualização Automática da Lista CSNU
+
+on:
+  schedule:
+    # Executa diariamente às 04:00 UTC (01:00 horário de Brasília)
+    - cron: '0 4 * * *'
+  # Permite executar manualmente pelo painel do GitHub na aba "Actions"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-csnu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar Dependências
+        run: |
+          pip install pandas pyarrow
+
+      - name: Executar ETL da Lista CSNU
+        run: |
+          python scripts/etl_csnu.py
+
+      - name: Commit e Push se houver novas sanções
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Adiciona os arquivos gerados
+          git add csnu_list.parquet public/sanctioned_names.json static/sanctioned_names.json
+          
+          # Só commita se houver diferenças reais
+          if git diff --staged --quiet; then
+            echo "Nenhuma alteração na lista da ONU encontrada hoje."
+          else
+            echo "Alterações detectadas! Enviando commit..."
+            git commit -m "chore(data): lista de sanções CSNU atualizada automaticamente [skip ci]"
+            git push
+          fi
