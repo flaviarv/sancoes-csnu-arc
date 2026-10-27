@@ -272,7 +272,8 @@ export default function CsnuChecker({ onSearchComplete, isPaid }: Props) {
     }
   }
 
-  const sanctionedCount = results.filter(r => r.is_contained).length
+  const sanctionedResults = results.filter(r => r.is_contained)
+  const sanctionedCount = sanctionedResults.length
   const clearCount = results.filter(r => !r.is_contained).length
 
   function getFileIcon(filename: string) {
@@ -453,66 +454,75 @@ export default function CsnuChecker({ onSearchComplete, isPaid }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Barra de Resumo */}
+      {/* Resultados da Verificação */}
       <AnimatePresence>
         {searched && results.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3"
-          >
-            {sanctionedCount > 0 && (
-              <div className="flex-1 rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-2">
-                <ShieldAlert size={16} className="text-red-500 shrink-0" />
-                <span className="text-sm font-semibold text-red-700">{sanctionedCount} sancionado(s)</span>
-              </div>
-            )}
-            {clearCount > 0 && (
-              <div className="flex-1 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center gap-2">
-                <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
-                <span className="text-sm font-semibold text-emerald-700">{clearCount} não listado(s)</span>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Lista de Resultados */}
-      <AnimatePresence>
-        {results.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1"
-          >
-            {results.map((r, i) => (
+          <div className="space-y-3">
+            {sanctionedCount === 0 ? (
               <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.5) }}
-                className={`rounded-xl px-4 py-3.5 flex items-start gap-3 border ${
-                  r.is_contained
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-emerald-50 border-emerald-100'
-                }`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 text-center flex flex-col items-center justify-center space-y-2"
               >
-                {r.is_contained ? (
-                  <ShieldAlert size={16} className="text-red-500 mt-0.5 shrink-0" />
-                ) : (
-                  <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{r.name}</p>
-                  <p className={`text-xs mt-0.5 ${r.is_contained ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {r.is_contained
-                      ? 'Consta na lista oficial de sanções do CSNU'
-                      : 'Não consta na lista do CSNU'}
-                  </p>
+                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-1">
+                  <ShieldCheck size={28} />
                 </div>
+                <p className="text-sm font-bold text-emerald-900">
+                  Nenhum nome encontrado na lista de sancionados da CSNU
+                </p>
+                <p className="text-xs text-emerald-700">
+                  Todos os {results.length} {results.length === 1 ? 'nome consultado está livre' : 'nomes consultados estão livres'} de sanções.
+                </p>
               </motion.div>
-            ))}
-          </motion.div>
+            ) : (
+              <div className="space-y-3">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl bg-red-100/90 border border-red-200 px-4 py-3 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <ShieldAlert size={18} className="text-red-600 shrink-0" />
+                    <span className="text-sm font-bold text-red-900">
+                      {sanctionedCount} {sanctionedCount === 1 ? 'nome sancionado encontrado' : 'nomes sancionados encontrados'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold bg-red-200/80 text-red-800 px-2.5 py-0.5 rounded-full">
+                    de {results.length} {results.length === 1 ? 'nome' : 'nomes'}
+                  </span>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1"
+                >
+                  {sanctionedResults.map((r, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(i * 0.04, 0.4) }}
+                      className="rounded-xl px-4 py-3.5 flex items-start gap-3 border bg-red-50 border-red-200"
+                    >
+                      <ShieldAlert size={16} className="text-red-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-slate-900 truncate">{r.name}</p>
+                          <span className="text-[11px] font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-md shrink-0">
+                            Sancionado
+                          </span>
+                        </div>
+                        <p className="text-xs text-red-700 mt-0.5">
+                          Consta na lista oficial de sanções do CSNU
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
+            )}
+          </div>
         )}
       </AnimatePresence>
     </div>
