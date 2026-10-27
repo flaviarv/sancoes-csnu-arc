@@ -46,7 +46,6 @@ jobs:
           bun install --frozen-lockfile
           bun run build
           cd ..
-          rm -rf public/assets static/assets
           cp -r frontend/dist/* public/
           cp -r frontend/dist/* static/
 
