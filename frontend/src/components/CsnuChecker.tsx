@@ -310,7 +310,7 @@ export default function CsnuChecker({ onSearchComplete, isPaid }: Props) {
           }`}
         >
           <UploadCloud size={14} />
-          Enviar arquivo (.csv, .txt, .json, .pdf)
+          Enviar arquivo
         </button>
       </div>
 
