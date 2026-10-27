@@ -26,30 +26,67 @@ export default function CsnuChecker({ onSearchComplete, isPaid }: Props) {
 
   const lineCount = input.split('\n').filter(l => l.trim()).length
 
+  function normalizeClientText(str: string): string {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+  }
+
   async function handleCheck() {
     if (!input.trim()) return
     setLoading(true)
     setError(null)
     setResults([])
     try {
-      const res = await fetch('/api/check-names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raw_input: input }),
-      })
-      if (!res.ok) {
-        const detail: unknown = await res.json().catch(() => ({}))
-        const detailMsg = typeof (detail as Record<string, unknown>)?.detail === 'string'
-          ? (detail as Record<string, unknown>).detail as string
-          : `Server error ${res.status}`
-        throw new Error(detailMsg)
+      let data: CheckResponse | null = null
+
+      try {
+        const res = await fetch('/api/check-names', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw_input: input }),
+        })
+        if (res.ok) {
+          data = await res.json() as CheckResponse
+        }
+      } catch (err) {
+        console.warn('API fetch failed, falling back to static list...', err)
       }
-      const data = await res.json() as CheckResponse
+
+      // Se a rota serverless da Vercel retornar 404 ou erro, consulta instantânea no banco de dados JSON oficial
+      if (!data) {
+        const jsonRes = await fetch('/sanctioned_names.json')
+        if (!jsonRes.ok) throw new Error('Não foi possível carregar a lista de sanções.')
+        const sanctionedList: string[] = await jsonRes.json()
+        const sanctionedSet = new Set(sanctionedList)
+
+        const rawLines = input.split('\n')
+        const clientResults: NameResult[] = []
+
+        for (const line of rawLines) {
+          const lineClean = line.trim()
+          if (!lineClean) continue
+          const normalized = normalizeClientText(lineClean)
+          const isContained = sanctionedSet.has(normalized)
+          clientResults.push({
+            name: lineClean,
+            is_contained: isContained,
+            message: isContained
+              ? `O nome '${lineClean}' está contido na lista CSNU.`
+              : `O nome '${lineClean}' não está contido na lista do CSNU.`
+          })
+        }
+        data = { results: clientResults }
+      }
+
       setResults(data.results)
       setSearched(true)
       onSearchComplete?.(data.results, input)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Connection error — is the backend running?')
+      setError(e instanceof Error ? e.message : 'Erro ao consultar a lista de sanções.')
     } finally {
       setLoading(false)
     }
