@@ -1,17 +1,21 @@
+"""
+main.py / main_docker.py — Backend FastAPI + Frontend Estático (Docker & Vercel).
+"""
+import os
 import unicodedata
 from typing import List, Set
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import pandas as pd
 
 app = FastAPI(title="Verificador de Sanções CSNU")
 
-# Variável global para armazenar o conjunto normalizado de nomes do CSNU
 SANCTIONED_NAMES: Set[str] = set()
 
 
 def normalize_text(text: str) -> str:
-    """Normaliza texto: remove acentos, espaços extras e converte para minúsculas."""
     if not isinstance(text, str):
         return ""
     text = unicodedata.normalize("NFKD", text)
@@ -20,10 +24,6 @@ def normalize_text(text: str) -> str:
 
 
 def load_csnu_dataset(parquet_path: str = "csnu_list.parquet"):
-    """
-    Carrega o arquivo Parquet e extrai todos os nomes completos e aliases.
-    Adapte as colunas conforme a estrutura exata do seu arquivo.
-    """
     global SANCTIONED_NAMES
     try:
         df = pd.read_parquet(parquet_path)
@@ -31,49 +31,50 @@ def load_csnu_dataset(parquet_path: str = "csnu_list.parquet"):
         print(f"Erro ao carregar arquivo Parquet: {e}")
         return
 
-    extracted_names = set()
+    extracted_names: Set[str] = set()
 
     for _, row in df.iterrows():
-        # 1. Composição de nome de indivíduos (First, Second, Third, Fourth Name)
         parts = [
             str(row[col])
             for col in ["FIRST_NAME", "SECOND_NAME", "THIRD_NAME", "FOURTH_NAME"]
             if col in row and pd.notna(row[col]) and str(row[col]).strip()
         ]
         if parts:
-            full_name = " ".join(parts)
-            extracted_names.add(normalize_text(full_name))
+            extracted_names.add(normalize_text(" ".join(parts)))
 
-        # 2. Nome original ou nomes de entidades
         for col in ["NAME_ORIGINAL_SCRIPT"]:
             if col in row and pd.notna(row[col]):
                 extracted_names.add(normalize_text(str(row[col])))
 
-        # 3. Aliases de indivíduos (listas de dicionários com ALIAS_NAME)
         if "INDIVIDUAL_ALIAS" in row and isinstance(row["INDIVIDUAL_ALIAS"], list):
             for alias in row["INDIVIDUAL_ALIAS"]:
-                if isinstance(alias, dict) and "ALIAS_NAME" in alias and alias["ALIAS_NAME"]:
+                if isinstance(alias, dict) and alias.get("ALIAS_NAME"):
                     extracted_names.add(normalize_text(str(alias["ALIAS_NAME"])))
 
-        # 4. Aliases de entidades
         if "ENTITY_ALIAS" in row and isinstance(row["ENTITY_ALIAS"], list):
             for alias in row["ENTITY_ALIAS"]:
-                if isinstance(alias, dict) and "ALIAS_NAME" in alias and alias["ALIAS_NAME"]:
+                if isinstance(alias, dict) and alias.get("ALIAS_NAME"):
                     extracted_names.add(normalize_text(str(alias["ALIAS_NAME"])))
 
-    # Remove entradas vazias
     SANCTIONED_NAMES = {name for name in extracted_names if name}
     print(f"Dataset carregado: {len(SANCTIONED_NAMES)} nomes únicos indexados.")
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARQUET_FILE = os.path.join(BASE_DIR, "csnu_list.parquet")
+load_csnu_dataset(PARQUET_FILE)
+
+
 @app.on_event("startup")
 def startup_event():
-    load_csnu_dataset("csnu_list.parquet")
+    if not SANCTIONED_NAMES:
+        load_csnu_dataset(PARQUET_FILE)
 
 
-# Modelos da API
+# ── API ──────────────────────────────────────────────────
+
 class CheckNamesRequest(BaseModel):
-    raw_input: str  # Texto enviado pelo usuário contendo os nomes
+    raw_input: str
 
 
 class NameResult(BaseModel):
@@ -87,103 +88,41 @@ class CheckNamesResponse(BaseModel):
 
 
 @app.post("/check-names", response_model=CheckNamesResponse)
+@app.post("/api/check-names", response_model=CheckNamesResponse)
 def check_names(payload: CheckNamesRequest):
-    """
-    Recebe um texto com vários nomes (um por linha) e valida contra a lista do CSNU.
-    """
-    if not payload.raw_input.strip():
+    if not payload.raw_input or not payload.raw_input.strip():
         raise HTTPException(status_code=400, detail="Nenhum nome fornecido.")
 
-    # Divide o texto por linha
-    raw_lines = payload.raw_input.splitlines()
+    if not SANCTIONED_NAMES:
+        load_csnu_dataset(PARQUET_FILE)
+
     results = []
-
-    for line in raw_lines:
+    for line in payload.raw_input.splitlines():
         line_clean = line.strip()
-
-        # Ignora linhas em branco
         if not line_clean:
             continue
-
-        normalized_query = normalize_text(line_clean)
-
-        # Regra 2 e 3: Analisa se o nome está na lista do CSNU
-        is_in_csnu = normalized_query in SANCTIONED_NAMES
-
-        if is_in_csnu:
-            msg = f"O nome '{line_clean}' está contido na lista CSNU."
-        else:
-            msg = f"O nome '{line_clean}' não está contido na lista do CSNU."
-
-        results.append(
-            NameResult(
-                name=line_clean,
-                is_contained=is_in_csnu,
-                message=msg
-            )
-        )
-
+        is_in_csnu = normalize_text(line_clean) in SANCTIONED_NAMES
+        results.append(NameResult(
+            name=line_clean,
+            is_contained=is_in_csnu,
+            message=(
+                f"O nome '{line_clean}' está contido na lista CSNU."
+                if is_in_csnu else
+                f"O nome '{line_clean}' não está contido na lista do CSNU."
+            ),
+        ))
     return CheckNamesResponse(results=results)
 
-# ======================================================
-#               INTERFACE SWAGGER
-# ======================================================
 
-from fastapi.responses import HTMLResponse
+# ── Frontend estático ────────────────────────────────────
 
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return """
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <title>Consulta CSNU</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-            textarea { width: 100%; height: 180px; padding: 10px; font-size: 14px; box-sizing: border-box; }
-            button { background-color: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; border-radius: 4px; }
-            button:hover { background-color: #0056b3; }
-            .result { margin-top: 20px; padding: 10px; border-radius: 4px; font-weight: bold; }
-            .contained { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-            .not-contained { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        </style>
-    </head>
-    <body>
-        <h2>Verificador de Sanções - CSNU</h2>
-        <p>Cole ou digite os nomes abaixo (<strong>apenas 1 nome por linha</strong>):</p>
-        <textarea id="namesInput" placeholder="Exemplo:&#10;Noor Wali Mehsud&#10;João da Silva&#10;Abubakar Swalleh"></textarea><br>
-        <button onclick="verificar()">Verificar Nomes</button>
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-        <div id="output"></div>
+if os.path.isdir(STATIC_DIR):
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-        <script>
-            async function verificar() {
-                const text = document.getElementById('namesInput').value;
-                const output = document.getElementById('output');
-                output.innerHTML = 'Consultando...';
-
-                try {
-                    const response = await fetch('/check-names', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ raw_input: text })
-                    });
-                    const data = await response.json();
-                    output.innerHTML = '';
-                    
-                    data.results.forEach(res => {
-                        const div = document.createElement('div');
-                        div.className = 'result ' + (res.is_contained ? 'contained' : 'not-contained');
-                        div.innerText = res.message;
-                        output.appendChild(div);
-                    });
-                } catch (e) {
-                    output.innerHTML = '<p style="color:red">Erro ao consultar o servidor.</p>';
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
-
+    @app.get("/", include_in_schema=False)
+    def serve_root():
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
