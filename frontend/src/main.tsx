@@ -25,6 +25,22 @@ import './index.css'
 
 const queryClient = new QueryClient()
 
+// Auto-recuperação de cache quando um novo deploy substitui módulos dinâmicos (ChunkLoadError)
+window.addEventListener('vite:preloadError', () => {
+  window.location.reload()
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason?.message?.includes('Failed to fetch dynamically imported module')) {
+    const lastReload = sessionStorage.getItem('chunk_reload')
+    const now = Date.now()
+    if (!lastReload || now - Number(lastReload) > 10000) {
+      sessionStorage.setItem('chunk_reload', String(now))
+      window.location.reload()
+    }
+  }
+})
+
 // Studio logo SVG
 const StudioLogo = () => (
   <svg width="14" height="16" viewBox="0 0 20 22" fill="none" xmlns="http://www.w3.org/2000/svg">
