@@ -62,9 +62,15 @@ def load_csnu_dataset(parquet_path: str = "csnu_list.parquet"):
     print(f"Dataset carregado: {len(SANCTIONED_NAMES)} nomes únicos indexados.")
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARQUET_FILE = os.path.join(BASE_DIR, "csnu_list.parquet")
+load_csnu_dataset(PARQUET_FILE)
+
+
 @app.on_event("startup")
 def startup_event():
-    load_csnu_dataset("csnu_list.parquet")
+    if not SANCTIONED_NAMES:
+        load_csnu_dataset(PARQUET_FILE)
 
 
 # ── API ──────────────────────────────────────────────────
@@ -84,8 +90,11 @@ class CheckNamesResponse(BaseModel):
 @app.post("/check-names", response_model=CheckNamesResponse)
 @app.post("/api/check-names", response_model=CheckNamesResponse)
 def check_names(payload: CheckNamesRequest):
-    if not payload.raw_input.strip():
+    if not payload.raw_input or not payload.raw_input.strip():
         raise HTTPException(status_code=400, detail="Nenhum nome fornecido.")
+
+    if not SANCTIONED_NAMES:
+        load_csnu_dataset(PARQUET_FILE)
 
     results = []
     for line in payload.raw_input.splitlines():
@@ -107,16 +116,19 @@ def check_names(payload: CheckNamesRequest):
 
 # ── Frontend estático ────────────────────────────────────
 
-STATIC_DIR = "static"
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 if os.path.isdir(STATIC_DIR):
-    # Serve arquivos JS/CSS/assets
-    app.mount("/assets", StaticFiles(directory=f"{STATIC_DIR}/assets"), name="assets")
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/", include_in_schema=False)
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_spa(full_path: str = ""):
-        # Rotas da API já foram registradas antes do mount — aqui só chega o frontend
-        # Nunca serve index.html para chamadas /api/* (o FastAPI resolve antes)
+        candidate = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
         index = os.path.join(STATIC_DIR, "index.html")
         return FileResponse(index)
+
