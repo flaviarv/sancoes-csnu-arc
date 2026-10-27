@@ -36,7 +36,7 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Código do backend (versão Docker com static files)
-COPY main_docker.py ./main.py
+COPY main.py ./main.py
 COPY csnu_list.parquet ./csnu_list.parquet
 
 # Frontend compilado (copiado do stage anterior)

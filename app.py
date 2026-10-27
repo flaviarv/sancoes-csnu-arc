@@ -1,4 +1,4 @@
 """
-app.py — Entrypoint principal detectado automaticamente pela Vercel (FastAPI preset).
+app.py — Entrypoint detectado automaticamente pela Vercel (preset FastAPI).
 """
-from main_docker import app
+from main import app
