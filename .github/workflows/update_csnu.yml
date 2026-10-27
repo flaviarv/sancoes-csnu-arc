@@ -45,6 +45,6 @@ jobs:
             echo "Nenhuma alteração na lista da ONU encontrada hoje."
           else
             echo "Alterações detectadas! Enviando commit..."
-            git commit -m "chore(data): lista de sanções CSNU atualizada automaticamente [skip ci]"
+            git commit -m "chore(data): lista de sanções CSNU atualizada automaticamente"
             git push
           fi
